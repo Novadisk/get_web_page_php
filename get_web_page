@@ -1,0 +1,91 @@
+function get_web_page($url) {
+    //header('Content-Type: text/html; charset=UTF-8');
+
+    $options = array(
+        CURLOPT_RETURNTRANSFER => true,   // return web page
+        CURLOPT_VERBOSE => true,
+        CURLOPT_HEADER         => true,  // don't return headers
+        CURLOPT_FOLLOWLOCATION => true,   // follow redirects
+        CURLOPT_MAXREDIRS      => 10,     // stop after 10 redirects
+        CURLOPT_ENCODING       => "UTF-8",     // handle compressed
+        CURLOPT_USERAGENT      => "test", // name of client
+        CURLOPT_AUTOREFERER    => true,   // set referrer on redirect
+        CURLOPT_CONNECTTIMEOUT => 120,    // time-out on connect
+        CURLOPT_TIMEOUT        => 120,    // time-out on response
+    ); 
+
+    $attempts_left = 3;
+    $try = true;
+
+    while ($try && $attempts_left > 0)
+    {              
+        //$url = utf8_encode($url);
+        //$url = iconv("UTF-8","Windows-1252//IGNORE",$url);  
+        //$url = @iconv("UTF-8","Windows-1252//IGNORE",$url);  
+
+        //$url = iconv("UTF-8","Windows-1252//IGNORE",$url);  
+
+        //ISO-8859-1
+        //$url = iconv("UTF-8","ANSI", $url);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, $options);
+
+        $content  = curl_exec($ch);
+
+        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        $body = substr($content, $header_size);
+
+        $retry_after = 10;
+
+        if ($code == 429)
+        {
+            $header = substr($content, 0, $header_size);
+
+            //echo "<br><br><br>*************************************************ERROR!!!!! GOT CODE 429 HERE!!!!********************************************<br><br><br>";
+            //echo "<br><br><br>*** Warning: Server is busy.  If your results do not show completely, please try again in 10 seconds.  ***<br><br><br>";               
+
+            $header_lines = explode("\n", $header);
+
+            $lines_count = count($header_lines);
+
+            $find = "Retry-After: ";         
+
+            //var_dump($find);
+
+            for ($z = 0; $z < $lines_count; $z++)
+            {
+                $position = strpos($header_lines[$z], $find);
+
+
+                //Check if header line contains 'Retry-After: '
+                if ( $position !== false && $position !== NULL && $position != -1)
+                {
+                    //Set Retry
+                    $retry_after = (int)substr($header_lines[$z], $position + strlen($find));
+
+                    sleep($retry_after);
+
+                }
+
+
+            }
+
+        } else {$try = false;}
+
+        $attempts_left--;
+    }
+
+
+    $output_array = [
+        "response_code" => $code,
+        "body" => $body,
+        "retry" => $retry_after
+    ];
+    curl_close($ch);
+
+    return $output_array;        
+}
